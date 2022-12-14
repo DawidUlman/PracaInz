@@ -2,11 +2,13 @@
 LIBRARY IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.numeric_std.ALL;
+use IEEE.std_logic_unsigned.all;
 
 ENTITY Codec IS
 GENERIC (
 clk_freq     : INTEGER := 50000000;
-i2c_clk_freq : INTEGER := 20000
+i2c_clk_freq : INTEGER := 20000;
+N : INTEGER := 10000
 );
 PORT
 (
@@ -26,13 +28,14 @@ SIGNAL go                    : BOOLEAN;
 SIGNAL ack                   : STD_LOGIC_VECTOR (1 TO 3);
 SIGNAL num                   : unsigned(3 DOWNTO 0);
 SIGNAL i2c_out               : STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL cnt : STD_LOGIC_VECTOR(N-1 downto 0);
 
 CONSTANT address : STD_LOGIC_VECTOR (7 DOWNTO 0) := x"34"; -- I2C device address, CSB set to 0 (p. 17)
-TYPE codec IS ARRAY (0 TO 11) OF STD_LOGIC_VECTOR (15 DOWNTO 0);
+TYPE codec IS ARRAY (0 TO 10) OF STD_LOGIC_VECTOR (15 DOWNTO 0);
 CONSTANT Audio_init : codec :=
                               (
                               x"F000", -- reset
-                              x"0C30", -- R6 default (0C9F), power on line in, adc, dac, no out(0C12), out on(0C02) (p. 23)
+                              --x"0C30", -- R6 default (0C9F), power on line in, adc, dac, no out(0C12), out on(0C02) (p. 23)
                               x"001F", -- R0 changed LINVOL, +33 dB(003F) (p. 20), default (0017), +6 dB (001F)
                               x"021F", -- R1 changed RINVOL, +33 dB(023F) (p. 21), default (0297), +6 dB (021F)
                               x"047B", -- R2 changed LHPVOL, +6 dB(047F) (p. 21), default (0479) (047B) (0579)
@@ -56,8 +59,18 @@ iic_sda_io <= '0' WHEN SDO = '0' ELSE 'Z';
 
 --Clock 
 
+Licznik : PROCESS (clk, reset) IS
+BEGIN
+    IF (reset = '1') THEN
+        cnt <= (others => '0');
+    ELSIF (clk'event AND clk = '1') THEN
+        cnt <= cnt + 1;
+    END IF;
+END PROCESS;
+
+
 Clock_gen : PROCESS (clk, reset) IS
-VARIABLE count : INTEGER RANGE 0 TO clk_freq/i2c_clk_freq;
+variable count : INTEGER RANGE 0 TO clk_freq/i2c_clk_freq;
 BEGIN
     IF (reset = '1') THEN
         i2c_clk <= '0';
@@ -72,10 +85,10 @@ BEGIN
     END IF;
 END PROCESS;
 
+
 --Setting the configuration
 
 audio_conf : PROCESS (i2c_clk, reset) IS
-variable a_wait : integer := 500000000;
 BEGIN
     IF (reset = '1') THEN 
         go    <= false;
@@ -86,12 +99,11 @@ BEGIN
 CASE AUDIO IS
 WHEN s1 =>
     go <= true;
-    if(num = 10) then 
+    if(num = 9) then 
         i2c_out <= SAMPLE_CTRL;
     else
-        if (num = 11) then 
-            if (a_wait = 0) then 
-                wait for 1000 ms;
+        if (num = 10) then 
+            if (cnt = std_logic_vector(to_signed(N, cnt'length))) then 
                 i2c_out <= Audio_init(to_integer (num));
             else 
                 Audio <= s5;   
@@ -116,10 +128,7 @@ WHEN s4 =>
     num   <= num + 1;
     Audio <= s5;
 WHEN s5 =>
-    if (num = 11) then 
-        a_wait := a_wait - 1;
-    end if;
-    IF (num < 12) THEN
+    IF (num < 11) THEN
         Audio <= s1;
     ELSE
         done <= '0';
