@@ -31,11 +31,11 @@ SIGNAL i2c_out               : STD_LOGIC_VECTOR(15 DOWNTO 0);
 SIGNAL cnt : STD_LOGIC_VECTOR(N-1 downto 0);
 
 CONSTANT address : STD_LOGIC_VECTOR (7 DOWNTO 0) := x"34"; -- I2C device address, CSB set to 0 (p. 17)
-TYPE codec IS ARRAY (0 TO 10) OF STD_LOGIC_VECTOR (15 DOWNTO 0);
+TYPE codec IS ARRAY (0 TO 11) OF STD_LOGIC_VECTOR (15 DOWNTO 0);
 CONSTANT Audio_init : codec :=
                               (
                               x"F000", -- reset
-                              --x"0C30", -- R6 default (0C9F), power on line in, adc, dac, no out(0C12), out on(0C02) (p. 23)
+                              x"0C30", -- R6 default (0C9F), power on line in, adc, dac, no out(0C12), out on(0C02) (p. 23)
                               x"001F", -- R0 changed LINVOL, +33 dB(003F) (p. 20), default (0017), +6 dB (001F)
                               x"021F", -- R1 changed RINVOL, +33 dB(023F) (p. 21), default (0297), +6 dB (021F)
                               x"047B", -- R2 changed LHPVOL, +6 dB(047F) (p. 21), default (0479) (047B) (0579)
@@ -99,10 +99,10 @@ BEGIN
 CASE AUDIO IS
 WHEN s1 =>
     go <= true;
-    if(num = 9) then 
+    if(num = 10) then 
         i2c_out <= SAMPLE_CTRL;
     else
-        if (num = 10) then 
+        if (num = 11) then 
             if (cnt = std_logic_vector(to_signed(N, cnt'length))) then 
                 i2c_out <= Audio_init(to_integer (num));
             else 
@@ -128,7 +128,7 @@ WHEN s4 =>
     num   <= num + 1;
     Audio <= s5;
 WHEN s5 =>
-    IF (num < 11) THEN
+    IF (num < 12) THEN
         Audio <= s1;
     ELSE
         done <= '0';

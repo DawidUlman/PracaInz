@@ -69,25 +69,25 @@ I2C_controller:entity work.Codec port map(
 ac_pblrc <= lrck;
 ac_reclrc <= lrck;
 
--- MCLK
+--MCLK
 
 Clock_gen : PROCESS (clk, done) IS
     VARIABLE count : INTEGER RANGE 0 TO (clk_freq/div)*mult;
     BEGIN
-        IF (done = '1') THEN
+        IF (done = '0') THEN
             ac_mclk <= '0';
             count := 0;
-        ELSIF (clk'event AND clk = '1') THEN
-            IF (count < ((clk_freq/div)*mult)- 1) THEN
-                count := count + 1;
-            ELSE
+        ELSIF rising_edge(clk) THEN
+            IF (count >= ((clk_freq/div)*mult)- 1) THEN
                 count := 0;
                 ac_mclk <= NOT ac_mclk;
+            ELSE
+                count := count + 1;
             END IF;
         END IF;
     END PROCESS;
 
--- BCLK and LRCK init 
+--BCLK and LRCK init 
 
 Bclock: PROCESS(ac_mclk, reset) is 
     variable bcount : integer RANGE 0 to bit_count*2;
@@ -98,12 +98,12 @@ Bclock: PROCESS(ac_mclk, reset) is
             lrck <='1';
             bcount :=0;
             wcount :=0;
-        elsif(ac_mclk'event and ac_mclk='1') then 
+        elsif rising_edge(ac_mclk) then 
             if (bcount >= bit_range - 1) then 
                 bcount :=0;
                 ac_bclk <= not ac_bclk;
             else
-                bcount :=0;
+                bcount := bcount + 1;
             end if;
             if (wcount >= word_range - 1) then
                 wcount :=0;
